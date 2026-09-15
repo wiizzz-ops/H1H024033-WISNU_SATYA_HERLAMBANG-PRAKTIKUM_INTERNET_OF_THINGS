@@ -1,70 +1,61 @@
-#include <ESP8266WiFi.h>
+#include <ESP8266WiFi.h>  // Pustaka WiFi resmi untuk ESP8266
 
-const char* ssid = "S24";
-const char* password = "11111111";
+// Kredensial untuk mode Station (menyambung ke WiFi rumah)
+const char* sta_ssid     = "S24";
+const char* sta_password = "11111111";
 
-const int ledPin = 2; // LED indikator status koneksi
+// Kredensial untuk mode Access Point (dibuat oleh ESP32)
+const char* ap_ssid     = "ESP8266 CIIDUK WARRIOR";
+const char* ap_password = "12345678"; // minimal 8 karakter
 
 void setup() {
   Serial.begin(115200);
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, LOW);
-  
-  // Set mode WiFi menjadi Station
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  
-  Serial.print("Menghubungkan ke WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
+
+  // Set mode WiFi menjadi gabungan AP + STA
+  WiFi.mode(WIFI_AP_STA);
+
+  // --- Bagian Access Point ---
+  WiFi.softAP(ap_ssid, ap_password);
+  IPAddress apIP = WiFi.softAPIP();
+  Serial.println("Access Point aktif!");
+  Serial.print("AP SSID       : ");
+  Serial.println(ap_ssid);
+  Serial.print("AP IP Address : ");
+  Serial.println(apIP);
+
+  // --- Bagian Station ---
+  WiFi.begin(sta_ssid, sta_password);
+  Serial.print("Menghubungkan ke WiFi rumah");
+  int waktuTunggu = 0;
+  while (WiFi.status() != WL_CONNECTED && waktuTunggu < 20) {
     delay(500);
     Serial.print(".");
+    waktuTunggu++;
   }
-  
-  // Jika berhasil terhubung pada awal booting
   Serial.println();
-  Serial.println("WiFi berhasil terhubung!");
-  Serial.print("IP Address : ");
-  Serial.println(WiFi.localIP());
-  
-  digitalWrite(ledPin, HIGH); // nyalakan LED sebagai indikator terhubung
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("STA berhasil terhubung ke WiFi rumah!");
+    Serial.print("STA IP Address : ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("STA gagal terhubung ke WiFi rumah (AP tetap aktif).");
+  }
 }
 
 void loop() {
-  // Mengecek apakah koneksi WiFi terputus
+  // Memantau jumlah perangkat yang terhubung ke Access Point ESP32
+  int jumlahClient = WiFi.softAPgetStationNum();
+  Serial.print("Jumlah perangkat di AP  : ");
+  Serial.println(jumlahClient);
+
+  // Memantau status koneksi Station ke WiFi rumah
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("Status: Terhubung");
-  } 
-  else {
-    // Bagian penanganan saat WiFi terputus
-    Serial.println("Status: Terputus! Mencoba menghubungkan ulang (reconnect)...");
-    digitalWrite(ledPin, LOW); // Matikan LED karena koneksi hilang
-    
-    // 1. Putuskan sisa koneksi yang menggantung (opsional namun direkomendasikan)
-    WiFi.disconnect();
-    
-    // 2. Perintahkan ESP32 untuk menghubungkan ulang
-    WiFi.begin(ssid, password);
-    
-    // 3. Tunggu proses koneksi ulang dengan batas waktu (timeout)
-    int waktuTunggu = 0;
-    while (WiFi.status() != WL_CONNECTED && waktuTunggu < 10) {
-      delay(500);
-      Serial.print(".");
-      waktuTunggu++;
-    }
-    Serial.println();
-    
-    // 4. Evaluasi hasil percobaan reconnect
-    if (WiFi.status() == WL_CONNECTED) {
-      Serial.println("Berhasil terhubung kembali!");
-      Serial.print("IP Address : ");
-      Serial.println(WiFi.localIP());
-      digitalWrite(ledPin, HIGH); // Nyalakan LED kembali
-    } else {
-      Serial.println("Gagal menghubungkan ulang. Akan mencoba lagi pada siklus berikutnya.");
-    }
+    Serial.print("Status STA              : Terhubung, IP = ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("Status STA              : Terputus dari WiFi rumah");
   }
-  
-  // Jeda 5 detik sebelum melakukan pengecekan status berikutnya
+
   delay(5000);
 }
